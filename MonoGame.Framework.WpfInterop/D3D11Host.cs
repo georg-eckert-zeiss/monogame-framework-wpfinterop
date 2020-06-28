@@ -344,8 +344,8 @@ namespace MonoGame.Framework.WpfInterop
                 _toBeDisposedNextFrame.Add(_cachedRenderTarget);
             }
 
-            int width = Math.Max((int)ActualWidth, 1);
-            int height = Math.Max((int)ActualHeight, 1);
+            int width = (int)(Math.Max(ActualWidth, 1) * DpiScalingFactor);
+            int height = (int)(Math.Max(ActualHeight, 1) * DpiScalingFactor);
 
             CreateGraphicsDeviceDependentResources(new PresentationParameters
             {
