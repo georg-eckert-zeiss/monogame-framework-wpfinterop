@@ -24,6 +24,7 @@
             <Button Width="180" Height="30" Content="Show multiple msaa scenes" Margin="5" Click="OpenMultipleMsaaWindow" />
             <Button Width="180" Height="30" Content="Show dpi scaling scene" Margin="5" Click="OpenDpiScalingWindow" />
             <Button Width="180" Height="30" Content="Show sprite scene" Margin="5" Click="OpenSpriteWindow" />
+            <Button Width="180" Height="30" Content="Heavy load test scene" Margin="5" Click="OpenHeavyLoadWindow" />
         </StackPanel>
         <scenes:CubeDemoScene Grid.Column="1" />
     </Grid>

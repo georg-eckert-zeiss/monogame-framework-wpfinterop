@@ -88,5 +88,10 @@ namespace WpfTest.Views
         {
             OpenCustomWindow(new SpriteScene(), "Sprite scene");
         }
+
+        private void OpenHeavyLoadWindow(object sender, RoutedEventArgs e)
+        {
+            OpenCustomWindow(new HeavyLoadScene(), "Heavy load scene");
+        }
     }
 }

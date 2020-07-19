@@ -18,6 +18,10 @@ namespace MonoGame.Framework.WpfInterop
         private readonly List<IUpdateable> _sortedUpdateables;
         private readonly List<IDrawable> _sortedDrawables;
 
+        private int _skippedDrawCalls;
+        private TimeSpan _skippedDrawTime;
+        private int _updateFrameLag;
+
         #endregion
 
         #region Constructors
@@ -132,7 +136,6 @@ namespace MonoGame.Framework.WpfInterop
         /// </summary>
         protected virtual void LoadContent()
         {
-
         }
 
         /// <summary>
@@ -143,7 +146,41 @@ namespace MonoGame.Framework.WpfInterop
         {
             // just run as fast as possible, WPF itself is limited to 60 FPS so that's the max we will get
             Update(time);
-            Draw(time);
+
+            // TODO: determine when frames need to be skipped
+
+            // monogame defines slow as more than 5 skipped frames
+            if (_updateFrameLag >= 5)
+            {
+                time.IsRunningSlowly = true;
+            }
+
+            // skip draw calls under heavy load to prevent high delay between realtime and gametime https://github.com/MarcStan/monogame-framework-wpfinterop/issues/23
+            // slightly obscure logic compared to monogame:
+            // monogame can simply run many updates in a row until it catches up (monogame controls the gameloop)
+            // instead we are tied to the renderloop of WPF (60 FPS or lower)
+            // if we fall behind due to high system load we need to instead skip draw calls, record the skipped time and then later call 
+            if (time.IsRunningSlowly)
+            {
+                _skippedDrawCalls++;
+                // along with the missed calls also record the skipped time
+                _skippedDrawTime += time.ElapsedGameTime;
+            }
+            else
+            {
+                if (_skippedDrawCalls > 0)
+                {
+                    // if caught up, we need to patch the delta time for the draw call
+                    // e.g. running at 60 FPS but 5 draw calls are dropped
+                    // next draw call should have delta time of 6 * 1/60s
+                    // since draw calls should be interpolated based on this time this should yield correct animation (even if sometimes choppy)
+                    // but ultimatively fixes delay as per https://github.com/MarcStan/monogame-framework-wpfinterop/issues/23
+                    time = new GameTime(time.TotalGameTime, _skippedDrawTime + time.ElapsedGameTime);
+                    _skippedDrawCalls = 0;
+                    _skippedDrawTime = TimeSpan.Zero;
+                }
+                Draw(time);
+            }
         }
 
         /// <summary>
