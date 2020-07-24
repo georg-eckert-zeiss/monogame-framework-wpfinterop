@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Content;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace MonoGame.Framework.WpfInterop
 {
@@ -10,9 +11,9 @@ namespace MonoGame.Framework.WpfInterop
     /// </summary>
     public abstract class WpfGame : D3D11Host
     {
-        private readonly string _contentDir;
-
         #region Fields
+
+        private readonly string _contentDir;
 
         private ContentManager _content;
         private readonly List<IUpdateable> _sortedUpdateables;
@@ -21,6 +22,7 @@ namespace MonoGame.Framework.WpfInterop
         private int _skippedDrawCalls;
         private TimeSpan _skippedDrawTime;
         private int _updateFrameLag;
+        private readonly Stopwatch _stopwatch = new Stopwatch();
 
         #endregion
 
@@ -49,7 +51,7 @@ namespace MonoGame.Framework.WpfInterop
         /// <summary>
         /// Gets or sets whether this instance takes focus instantly on mouse over.
         /// If set to false, the user must click into the game panel to gain focus.
-        /// This applies to both <see cref="MonoGame.Framework.WpfInterop.Input.WpfMouse"/> and <see cref="MonoGame.Framework.WpfInterop.Input.WpfKeyboard"/> behaviour.
+        /// This applies to both <see cref="Input.WpfMouse"/> and <see cref="Input.WpfKeyboard"/> behaviour.
         /// Defaults to true.
         /// </summary>
         public bool FocusOnMouseOver { get; set; } = true;
@@ -144,10 +146,9 @@ namespace MonoGame.Framework.WpfInterop
         /// <param name="time"></param>
         protected sealed override void Render(GameTime time)
         {
+            _stopwatch.Restart();
             // just run as fast as possible, WPF itself is limited to 60 FPS so that's the max we will get
             Update(time);
-
-            // TODO: determine when frames need to be skipped
 
             // monogame defines slow as more than 5 skipped frames
             if (_updateFrameLag >= 5)
@@ -159,7 +160,7 @@ namespace MonoGame.Framework.WpfInterop
             // slightly obscure logic compared to monogame:
             // monogame can simply run many updates in a row until it catches up (monogame controls the gameloop)
             // instead we are tied to the renderloop of WPF (60 FPS or lower)
-            // if we fall behind due to high system load we need to instead skip draw calls, record the skipped time and then later call 
+            // if we fall behind due to high system load we need to instead skip draw calls, record the skipped time and then later call with the adjusted delta time
             if (time.IsRunningSlowly)
             {
                 _skippedDrawCalls++;
@@ -173,13 +174,28 @@ namespace MonoGame.Framework.WpfInterop
                     // if caught up, we need to patch the delta time for the draw call
                     // e.g. running at 60 FPS but 5 draw calls are dropped
                     // next draw call should have delta time of 6 * 1/60s
-                    // since draw calls should be interpolated based on this time this should yield correct animation (even if sometimes choppy)
-                    // but ultimatively fixes delay as per https://github.com/MarcStan/monogame-framework-wpfinterop/issues/23
+                    // draw calls should use the time to interpolate animations to smooth out skipped frames (even if sometimes choppy)
+                    // fixes delay as per https://github.com/MarcStan/monogame-framework-wpfinterop/issues/23
                     time = new GameTime(time.TotalGameTime, _skippedDrawTime + time.ElapsedGameTime);
                     _skippedDrawCalls = 0;
                     _skippedDrawTime = TimeSpan.Zero;
                 }
                 Draw(time);
+            }
+            _stopwatch.Stop();
+
+            if (_stopwatch.Elapsed > TargetElapsedTime)
+            {
+                // consider update to lag when update+draw takes longer than alloted timeframe
+                _updateFrameLag++;
+            }
+            else
+            {
+                // this reset might need some finetuning. unlike monogame which has a free loop we can't just run X updates and consider us to be up to date
+                // because Rendering is triggered by WPF scheduling.
+                // instead we need to assume everything is fine now
+                // if it's not then lag will need to accumulate again before frames are skipped
+                _updateFrameLag = 0;
             }
         }
 

@@ -19,6 +19,8 @@ namespace WpfTest.Scenes
         private BasicEffect _basicEffect;
         private WpfKeyboard _keyboard;
         private KeyboardState _keyboardState;
+        private WpfMouse _mouse;
+        private MouseState _mouseState;
         private Matrix _projectionMatrix;
         private VertexBuffer _vertexBuffer;
         private VertexDeclaration _vertexDeclaration;
@@ -31,11 +33,18 @@ namespace WpfTest.Scenes
         private RasterizerState _filled;
         private TextComponent _loadMessage;
         private int _loadCount = 1;
-        private readonly List<GameTime> _lastUpdates = new List<GameTime>();
-        private readonly List<GameTime> _lastDraws = new List<GameTime>();
+        private readonly Dictionary<long, int> _updateCountPerSecond = new Dictionary<long, int>
+        {
+            [0] = 0
+        };
+        private readonly Dictionary<long, int> _drawCountPerSecond = new Dictionary<long, int>
+        {
+            [0] = 0
+        };
         private const int _lookbackPeriodInSeconds = 3;
-        private const int _stepSize = 1;
+        private const int _stepSize = 5;
         private const int _cubesPerRow = 10;
+        private Vector3 _systemOffset;
 
         protected override void Initialize()
         {
@@ -49,15 +58,13 @@ namespace WpfTest.Scenes
             var message = new TextComponent(this, "Use +/- to increase/decrease system load (will redraw cubes multiple times to simulate load)", new Vector2(1, 0), HorizontalAlignment.Right);
             Components.Add(message);
 
-            _lastUpdates.Add(new GameTime(TimeSpan.Zero, TargetElapsedTime));
-            _lastDraws.Add(new GameTime(TimeSpan.Zero, TargetElapsedTime));
             _loadMessage = new TextComponent(this, GetLoadMessage(), new Vector2(0, 0.1f), HorizontalAlignment.Left);
             Components.Add(_loadMessage);
 
             float tilt = MathHelper.ToRadians(0);  // 0 degree angle
                                                    // Use the world matrix to tilt the cube along x and y axes.
-            _worldMatrix = Matrix.CreateRotationX(tilt) * Matrix.CreateRotationY(tilt);
-            _viewMatrix = Matrix.CreateLookAt(new Vector3(25, 25, 25), Vector3.Zero, Vector3.Up);
+            _worldMatrix = Matrix.CreateTranslation(_systemOffset) * Matrix.CreateRotationX(tilt) * Matrix.CreateRotationY(tilt);
+            _viewMatrix = Matrix.CreateLookAt(new Vector3(0, 25, -25), Vector3.Zero, Vector3.Up);
 
             _basicEffect = new BasicEffect(GraphicsDevice);
 
@@ -89,36 +96,15 @@ namespace WpfTest.Scenes
             SetupCube();
 
             _keyboard = new WpfKeyboard(this);
+            _mouse = new WpfMouse(this);
 
             base.Initialize();
         }
 
         private string GetLoadMessage() => string.Join(Environment.NewLine,
             $"Cube count (simulated load): {_loadCount * _cubesPerRow * _cubesPerRow}",
-            $"Last update duration: {_lastUpdates.Last().ElapsedGameTime.TotalSeconds:0.00}s",
-            $"Average update count per second: {AveragePerSecond(_lastUpdates):0}",
-            $"Last draw duration: {_lastDraws.Last().ElapsedGameTime.TotalSeconds:0.00}s",
-            $"Average draw count per second: {AveragePerSecond(_lastDraws):0}");
-
-        private double AveragePerSecond(List<GameTime> list)
-        {
-            if (list.Count == 0)
-                return 0;
-
-            var currentTime = list.Max(x => x.TotalGameTime);
-            var minTime = currentTime.Add(TimeSpan.FromSeconds(-_lookbackPeriodInSeconds - 1));
-            var dataset = list
-                // get only the last 3 seconds, current second is not complete 999/1000 times so ignore it as well as it would only skew down the result
-                .Where(x => x.TotalGameTime > minTime && x.TotalGameTime.Seconds < currentTime.Seconds)
-                .ToArray();
-
-            if (dataset.Length == 0)
-                return 0;
-
-            return dataset
-                .GroupBy(x => x.TotalGameTime.Seconds)
-                .Average(x => x.Count());
-        }
+            $"Updates over last 3 seconds: {string.Join(", ", _updateCountPerSecond.Keys.OrderBy(_ => _).TakeWhile((_, i) => i < _lookbackPeriodInSeconds).Select(x => _updateCountPerSecond[x]))}",
+            $"Draw over last 3 seconds: {string.Join(", ", _drawCountPerSecond.Keys.OrderBy(_ => _).TakeWhile((_, i) => i < _lookbackPeriodInSeconds).Select(x => _drawCountPerSecond[x]))}");
 
         private void SetupCube()
         {
@@ -239,12 +225,14 @@ namespace WpfTest.Scenes
 
         protected override void Update(GameTime gameTime)
         {
-            _lastUpdates.Add(gameTime);
-            while (_lastUpdates.Count > 1.0 / TargetElapsedTime.TotalSeconds * _lookbackPeriodInSeconds)
+            var key = (int)gameTime.TotalGameTime.TotalSeconds;
+            if (!_updateCountPerSecond.ContainsKey(key))
             {
-                // only keep records of last Xs
-                _lastUpdates.RemoveAt(0);
+                _updateCountPerSecond.Add(key, 0);
+                if (_updateCountPerSecond.Count > _lookbackPeriodInSeconds + 1)
+                    _updateCountPerSecond.Remove(_updateCountPerSecond.Keys.Min());
             }
+            _updateCountPerSecond[key]++;
 
             var previousKeyboardState = _keyboardState;
             _keyboardState = _keyboard.GetState();
@@ -260,19 +248,37 @@ namespace WpfTest.Scenes
             {
                 _loadCount = MathHelper.Clamp(_loadCount - _stepSize, 1, int.MaxValue);
             }
-            _loadMessage.Text = GetLoadMessage();
-
+            if (IsKeyPressed(Keys.Space))
+            {
+                _skipSome = !_skipSome;
+            }
+            var previousMouseState = _mouseState;
+            _mouseState = _mouse.GetState();
+            //if (_mouseState.LeftButton == ButtonState.Pressed)
+            {
+                var diff = previousMouseState.Position - _mouseState.Position;
+                var delta = new Vector3(diff.X, 0, diff.Y) * (float)gameTime.ElapsedGameTime.TotalSeconds * 2.4f;
+                _systemOffset += delta;
+            }
+            _loadMessage.Text = GetLoadMessage() + $"{(_skipSome ? "SKIP" : "")}";
+            _worldMatrix = Matrix.CreateTranslation(_systemOffset);
             base.Update(gameTime);
         }
 
+        private bool _skipSome;
+
         protected override void Draw(GameTime time)
         {
-            _lastDraws.Add(time);
-            while (_lastDraws.Count > 1.0 / TargetElapsedTime.TotalSeconds * _lookbackPeriodInSeconds)
+            var key = (int)time.TotalGameTime.TotalSeconds;
+            if (!_drawCountPerSecond.ContainsKey(key))
             {
-                // only keep records of last Xs
-                _lastDraws.RemoveAt(0);
+                _drawCountPerSecond.Add(key, 0);
+                if (_drawCountPerSecond.Count > _lookbackPeriodInSeconds + 1)
+                    _drawCountPerSecond.Remove(_drawCountPerSecond.Keys.Min());
             }
+            _drawCountPerSecond[key]++;
+            if (_skipSome && _drawCountPerSecond[key] % 10 != 0)
+                return;
 
             //The projection depends on viewport dimensions (aspect ratio).
             // Because WPF controls can be resized at any time (user resizes window)

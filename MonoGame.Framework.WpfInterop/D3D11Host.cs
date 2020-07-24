@@ -4,6 +4,7 @@ using MonoGame.Framework.WpfInterop.Internals;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -20,6 +21,7 @@ namespace MonoGame.Framework.WpfInterop
     {
         private static readonly object GraphicsDeviceLock = new object();
 
+        private readonly Dictionary<long, int> _updateCountPerSecond = new Dictionary<long, int>();
         private bool _isRendering;
 
         // The Direct3D 11 device (shared by all D3D11Host elements)
@@ -519,6 +521,7 @@ namespace MonoGame.Framework.WpfInterop
             if (!_isRendering)
                 return;
 
+
             if (_toBeDisposedNextFrame.Count > 0)
             {
                 DisposeRenderTargetsFromPreviousFrames();
@@ -531,10 +534,20 @@ namespace MonoGame.Framework.WpfInterop
                 _dpiChanged = false;
             }
 
+            var renderingEventArgs = (RenderingEventArgs)eventArgs;
+            var key = (int)renderingEventArgs.RenderingTime.TotalSeconds;
+            if (!_updateCountPerSecond.ContainsKey(key))
+            {
+                _updateCountPerSecond.Add(key, 0);
+                if (_updateCountPerSecond.Count > 4)
+                    _updateCountPerSecond.Remove(_updateCountPerSecond.Keys.Min());
+            }
+            _updateCountPerSecond[key]++;
+            Debug.WriteLine(string.Join(", ", _updateCountPerSecond.Keys.OrderBy(_ => _).TakeWhile((_, i) => i < 3).Select(x => _updateCountPerSecond[x])));
+
             // CompositionTarget.Rendering event may be raised multiple times per frame
             // (e.g. during window resizing).
             // this will be apparent when the last rendering time equals the new argument
-            var renderingEventArgs = (RenderingEventArgs)eventArgs;
             if (_lastRenderingTime != renderingEventArgs.RenderingTime)
             {
                 // get time since last actual rendering
