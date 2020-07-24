@@ -91,14 +91,10 @@ namespace MonoGame.Framework.WpfInterop
 
         /// <summary>
         /// Determines whether the game runs in fixed timestep or not.
-        /// WPF is capped at 60 FPS therefore  the current implementation always calls Update and Draw after each other continuously (if possible).
-        /// Since the rendering is based on the WPF render thread the exact times at which it will be called cannot be guaranteed and under heave load draw calls may be skipped.
-        /// Use <see cref="GameTime.ElapsedGameTime"/> in your draw calls to smooth out animations - in case of dropped frames it will contain larger values to accomodate the dropped calls.
+        /// The current implementation always calls Update and Draw after each other continuously.
+        /// Since the rendering is based on the WPF render thread the exact times at which it will be called cannot be guaranteed.
+        /// Therefore this value is always false.
         /// </summary>
-        /// <remarks>
-        /// TODO: should technically be true because WPF calls the rendering in fixed intervals?
-        /// Keeping hardcoded value for now to not create a breaking change..
-        /// </remarks>
         public bool IsFixedTimeStep => false;
 
         /// <summary>

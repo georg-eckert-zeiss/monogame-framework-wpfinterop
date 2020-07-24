@@ -108,7 +108,6 @@
     <Compile Include="ILogToUi.cs" />
     <Compile Include="Scenes\ModelScene.cs" />
     <Compile Include="Scenes\DpiScalingScene.cs" />
-    <Compile Include="Scenes\HeavyLoadScene.cs" />
     <Compile Include="Scenes\MsaaScene.cs" />
     <Compile Include="Scenes\SpriteScene.cs" />
     <Compile Include="Scenes\RenderTargetScene.cs" />
