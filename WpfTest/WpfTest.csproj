@@ -182,7 +182,7 @@
       <Version>3.7.0.9</Version>
     </PackageReference>
     <PackageReference Include="MonoGame.Framework.WindowsDX">
-      <Version>3.7.1.189</Version>
+      <Version>3.8.0.1641</Version>
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
