@@ -1,5 +1,9 @@
 # Changelog
 
+**v1.8.0**
+
+* Upgraded to Monogame 3.8
+
 **v1.7.1**
 
 * Fixed crash when resizing a WpfGame that has MSAA turned on
