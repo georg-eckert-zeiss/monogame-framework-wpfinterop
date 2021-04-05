@@ -1,12 +1,10 @@
 # MonoGame WPF Interop
 
-This (unoffical) package adds WPF support to MonoGame (tested with MonoGame 3.7, requires **MonoGame.Framework.WindowsDX**).
+This (unoffical) package adds WPF support to MonoGame (MonoGame 3.8, requires **MonoGame.Framework.WindowsDX**).
 
 You can host as many MonoGame controls in Wpf as you want by using the WpfGame control. Note that they are however limited to 60 FPS (this is a WPF limit).
 
-## NuGet
-___
-### [MonoGame.Framework.WpfInterop](https://nuget.org/packages/MonoGame.Framework.WpfInterop/) [![NuGet Status](https://img.shields.io/nuget/v/MonoGame.Framework.WpfInterop.svg?style=flat)](https://www.nuget.org/packages/MonoGame.Framework.WpfInterop/)
+### MonoGame.Framework.WpfInterop on [![NuGet Status](https://img.shields.io/nuget/v/MonoGame.Framework.WpfInterop.svg?style=flat)](https://www.nuget.org/packages/MonoGame.Framework.WpfInterop/)
 
 ## Example usage
 
