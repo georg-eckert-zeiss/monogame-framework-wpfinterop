@@ -1,201 +1,102 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{47B74078-7603-4364-9E22-DE6FC395EBB8}</ProjectGuid>
     <OutputType>WinExe</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>WpfTest</RootNamespace>
-    <AssemblyName>WpfTest</AssemblyName>
-    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <MonoGamePlatform>Windows</MonoGamePlatform>
-    <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
-    <WarningLevel>4</WarningLevel>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <TargetFrameworkProfile />
-    <NuGetPackageImportStamp>
-    </NuGetPackageImportStamp>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
+    <TargetFramework>net452</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <ContentTargetFolders>content</ContentTargetFolders>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="System.Net.Http" />
-    <Reference Include="System.Xaml">
-      <RequiredTargetFramework>4.0</RequiredTargetFramework>
-    </Reference>
-    <Reference Include="WindowsBase" />
-    <Reference Include="PresentationCore" />
-    <Reference Include="PresentationFramework" />
+    <PackageReference Include="MonoGame.Framework.WindowsDX" Version="3.8.0.1641" />
+    <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.0.1641" />
   </ItemGroup>
   <ItemGroup>
-    <ApplicationDefinition Include="App.xaml">
+    <ProjectReference Include="..\MonoGame.Framework.WpfInterop\MonoGame.Framework.WpfInterop.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <MonoGameContentReference Include="Content\Content.mgcb" Visible="false" />
+    <Content Include="Content\**\*" Exclude="Content\**\.DS_Store;Content\**\bin;Content\**\obj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\WpfTest.Core\App.xaml.cs" Link="App.xaml.cs" />
+    <Compile Include="..\WpfTest.Core\Components\FpsComponent.cs" Link="Components\FpsComponent.cs" />
+    <Compile Include="..\WpfTest.Core\Components\TextComponent.cs" Link="Components\TextComponent.cs" />
+    <Compile Include="..\WpfTest.Core\Components\TimingComponent.cs" Link="Components\TimingComponent.cs" />
+    <Compile Include="..\WpfTest.Core\HyperlinkExtensions.cs" Link="HyperlinkExtensions.cs" />
+    <Compile Include="..\WpfTest.Core\ILogToUi.cs" Link="ILogToUi.cs" />
+    <Compile Include="..\WpfTest.Core\Scenes\CubeDemoScene.cs" Link="Scenes\CubeDemoScene.cs" />
+    <Compile Include="..\WpfTest.Core\Scenes\DpiScalingScene.cs" Link="Scenes\DpiScalingScene.cs" />
+    <Compile Include="..\WpfTest.Core\Scenes\ModelScene.cs" Link="Scenes\ModelScene.cs" />
+    <Compile Include="..\WpfTest.Core\Scenes\MsaaScene.cs" Link="Scenes\MsaaScene.cs" />
+    <Compile Include="..\WpfTest.Core\Scenes\RenderTargetScene.cs" Link="Scenes\RenderTargetScene.cs" />
+    <Compile Include="..\WpfTest.Core\Scenes\SpriteScene.cs" Link="Scenes\SpriteScene.cs" />
+    <Compile Include="..\WpfTest.Core\Scenes\TabScene.cs" Link="Scenes\TabScene.cs" />
+    <Compile Include="..\WpfTest.Core\Scenes\TextInputScene.cs" Link="Scenes\TextInputScene.cs" />
+    <Compile Include="..\WpfTest.Core\UserControls\CloseableHeader.xaml.cs" Link="UserControls\CloseableHeader.xaml.cs" />
+    <Compile Include="..\WpfTest.Core\UserControls\CloseableTabItem.cs" Link="UserControls\CloseableTabItem.cs" />
+    <Compile Include="..\WpfTest.Core\UserControls\GameInUserControl.xaml.cs" Link="UserControls\GameInUserControl.xaml.cs" />
+    <Compile Include="..\WpfTest.Core\Views\CloseableTabWindow.xaml.cs" Link="Views\CloseableTabWindow.xaml.cs" />
+    <Compile Include="..\WpfTest.Core\Views\DpiScalingWindow.xaml.cs" Link="Views\DpiScalingWindow.xaml.cs" />
+    <Compile Include="..\WpfTest.Core\Views\MainWindow.xaml.cs" Link="Views\MainWindow.xaml.cs" />
+    <Compile Include="..\WpfTest.Core\Views\MultiMsaaWindow.xaml.cs" Link="Views\MultiMsaaWindow.xaml.cs" />
+    <Compile Include="..\WpfTest.Core\Views\MultiSceneWindow.xaml.cs" Link="Views\MultiSceneWindow.xaml.cs" />
+    <Compile Include="..\WpfTest.Core\Views\SimpleWindow.xaml.cs" Link="Views\SimpleWindow.xaml.cs" />
+    <Compile Include="..\WpfTest.Core\Views\TabWindow.xaml.cs" Link="Views\TabWindow.xaml.cs" />
+    <Compile Include="..\WpfTest.Core\Views\TextInputWindow.xaml.cs" Link="Views\TextInputWindow.xaml.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Update="Content\credits.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Update="Content\DefaultFont.xnb">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Update="Content\hello.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Update="Content\mech.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Components\" />
+    <Folder Include="Views\" />
+    <Folder Include="UserControls\" />
+    <Folder Include="Scenes\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ApplicationDefinition Include="..\WpfTest.Core\App.xaml" Link="App.xaml">
       <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
     </ApplicationDefinition>
-    <Page Include="UserControls\CloseableHeader.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </Page>
-    <Page Include="UserControls\GameInUserControl.xaml">
-      <SubType>Designer</SubType>
+    <Page Include="..\WpfTest.Core\UserControls\CloseableHeader.xaml" Link="UserControls\CloseableHeader.xaml">
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="Views\DpiScalingWindow.xaml">
+    <Page Include="..\WpfTest.Core\UserControls\GameInUserControl.xaml" Link="UserControls\GameInUserControl.xaml">
       <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
     </Page>
-    <Page Include="Views\MultiMsaaWindow.xaml">
+    <Page Include="..\WpfTest.Core\Views\CloseableTabWindow.xaml" Link="Views\CloseableTabWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
     </Page>
-    <Page Include="Views\MultiSceneWindow.xaml">
+    <Page Include="..\WpfTest.Core\Views\DpiScalingWindow.xaml" Link="Views\DpiScalingWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
     </Page>
-    <Page Include="Views\TabWindow.xaml">
+    <Page Include="..\WpfTest.Core\Views\MainWindow.xaml" Link="Views\MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
     </Page>
-    <Page Include="Views\CloseableTabWindow.xaml">
+    <Page Include="..\WpfTest.Core\Views\MultiMsaaWindow.xaml" Link="Views\MultiMsaaWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
     </Page>
-    <Page Include="Views\TextInputWindow.xaml">
+    <Page Include="..\WpfTest.Core\Views\MultiSceneWindow.xaml" Link="Views\MultiSceneWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
     </Page>
-    <Page Include="Views\SimpleWindow.xaml">
+    <Page Include="..\WpfTest.Core\Views\SimpleWindow.xaml" Link="Views\SimpleWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
     </Page>
-    <Page Include="Views\MainWindow.xaml">
+    <Page Include="..\WpfTest.Core\Views\TabWindow.xaml" Link="Views\TabWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
     </Page>
-    <Compile Include="App.xaml.cs">
-      <DependentUpon>App.xaml</DependentUpon>
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="Components\TextComponent.cs" />
-    <Compile Include="HyperlinkExtensions.cs" />
-    <Compile Include="ILogToUi.cs" />
-    <Compile Include="Scenes\ModelScene.cs" />
-    <Compile Include="Scenes\DpiScalingScene.cs" />
-    <Compile Include="Scenes\MsaaScene.cs" />
-    <Compile Include="Scenes\SpriteScene.cs" />
-    <Compile Include="Scenes\RenderTargetScene.cs" />
-    <Compile Include="Scenes\TabScene.cs" />
-    <Compile Include="Scenes\CubeDemoScene.cs" />
-    <Compile Include="Components\FpsComponent.cs" />
-    <Compile Include="Scenes\TextInputScene.cs" />
-    <Compile Include="Components\TimingComponent.cs" />
-    <Compile Include="UserControls\CloseableTabItem.cs" />
-    <Compile Include="UserControls\CloseableHeader.xaml.cs">
-      <DependentUpon>CloseableHeader.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="UserControls\GameInUserControl.xaml.cs">
-      <DependentUpon>GameInUserControl.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Views\DpiScalingWindow.xaml.cs">
-      <DependentUpon>DpiScalingWindow.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Views\MultiMsaaWindow.xaml.cs">
-      <DependentUpon>MultiMsaaWindow.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Views\MultiSceneWindow.xaml.cs">
-      <DependentUpon>MultiSceneWindow.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Views\TabWindow.xaml.cs">
-      <DependentUpon>TabWindow.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Views\CloseableTabWindow.xaml.cs">
-      <DependentUpon>CloseableTabWindow.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Views\TextInputWindow.xaml.cs">
-      <DependentUpon>TextInputWindow.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Views\SimpleWindow.xaml.cs">
-      <DependentUpon>SimpleWindow.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Views\MainWindow.xaml.cs">
-      <DependentUpon>MainWindow.xaml</DependentUpon>
-      <SubType>Code</SubType>
-    </Compile>
+    <Page Include="..\WpfTest.Core\Views\TextInputWindow.xaml" Link="Views\TextInputWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
-  <ItemGroup>
-    <Compile Include="Properties\AssemblyInfo.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <None Include="app.config" />
-    <None Include="Content\DefaultFont.xnb">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="Content\StumpyTree.fbx" />
-    <AppDesigner Include="Properties\" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\MonoGame.Framework.WpfInterop\MonoGame.Framework.WpfInterop.csproj">
-      <Project>{809F0D79-AEDC-4754-A213-FDBE97CCD6D6}</Project>
-      <Name>MonoGame.Framework.WpfInterop</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <MonoGameContentReference Include="Content\Content.mgcb" />
-    <None Include="Content\hello.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Content\credits.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="MonoGame.Content.Builder">
-      <Version>3.7.0.9</Version>
-    </PackageReference>
-    <PackageReference Include="MonoGame.Framework.WindowsDX">
-      <Version>3.8.0.1641</Version>
-    </PackageReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Content\mech.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
 </Project>
