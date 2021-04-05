@@ -1,5 +1,9 @@
 # Changelog
 
+**v1.9.0**
+
+* Added support for .Net Core 3.1 and .Net 5 by cross targeting .Net 4.5.2 and .Net Core 3.1
+
 **v1.8.0**
 
 * Upgraded to Monogame 3.8
