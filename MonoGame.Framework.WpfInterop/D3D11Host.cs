@@ -5,10 +5,14 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using SharpDX.Direct3D11;
+using SharpDX.DXGI;
 using Color = Microsoft.Xna.Framework.Color;
+using Resource = SharpDX.Direct3D11.Resource;
 
 namespace MonoGame.Framework.WpfInterop
 {
@@ -29,6 +33,11 @@ namespace MonoGame.Framework.WpfInterop
         private static bool? _isInDesignMode;
         private static int _referenceCount;
 
+        // References to the inner SharpDX graphics device context
+        private static DeviceContext _staticInnerGraphicsDeviceContext;
+        private DeviceContext _innerGraphicsDeviceContext;
+
+
         private D3D11Image _d3D11Image;
         private bool _disposed;
         private TimeSpan _lastRenderingTime;
@@ -38,12 +47,30 @@ namespace MonoGame.Framework.WpfInterop
         /// Shared between WPF and monogame.
         /// </summary>
         private RenderTarget2D _sharedRenderTarget;
+
+        /// <summary>
+        /// Inner SharpDX resource of the shared render target.
+        /// </summary>
+        private Resource _sharedRenderTargetResource;
+
         /// <summary>
         /// Actual rendertarget that monogame will draw into.
-        /// Once a draw call is finished it then copies its content to <see cref="_sharedRenderTarget"/>.
-        /// This prevents flickering of the screen when WPF decides to draw the rendertarget to screen while monogame is midway populating it.
         /// </summary>
         private RenderTarget2D _cachedRenderTarget;
+
+        /// <summary>
+        /// The <see cref="_cachedRenderTarget"/> will be drawn into this render target which has no MSAA enabled. This
+        /// makes it possible to copy over the content of this render target's resource to the
+        /// <see cref="_sharedRenderTarget"/>'s resource.
+        /// </summary>
+        private RenderTarget2D _cachedNoMSAARenderTarget;
+
+        /// <summary>
+        /// Inner SharpDX resource of the cached no MSAA render target.
+        /// </summary>
+        private Resource _cachedNoMSAARenderTargetResource;
+
+
         private bool _resetBackBuffer, _dpiChanged;
         private bool _isActive;
         private SpriteBatch _spriteBatch;
@@ -177,6 +204,11 @@ namespace MonoGame.Framework.WpfInterop
         public GraphicsDevice GraphicsDevice => UseASingleSharedGraphicsDevice ? _staticGraphicsDevice : _graphicsDevice;
 
         /// <summary>
+        /// Gets the inner SharpDX graphics device context.
+        /// </summary>
+        public DeviceContext InnerGraphicsDeviceContext => UseASingleSharedGraphicsDevice ? _staticInnerGraphicsDeviceContext : _innerGraphicsDeviceContext;
+
+        /// <summary>
         /// Default services collection.
         /// </summary>
         public GameServiceContainer Services { get; } = new GameServiceContainer();
@@ -261,12 +293,35 @@ namespace MonoGame.Framework.WpfInterop
                         DeviceWindowHandle = IntPtr.Zero
                     };
                     var gd = CreateSharedGraphicsDevice(presentationParameters);
+                    var sharpDXdc = GetSharpDxDeviceContextWithReflection(gd);
+
                     if (UseASingleSharedGraphicsDevice)
+                    {
                         _staticGraphicsDevice = gd;
+                        _staticInnerGraphicsDeviceContext = sharpDXdc;
+                    }
                     else
+                    {
                         _graphicsDevice = gd;
+                        _innerGraphicsDeviceContext = sharpDXdc;
+                    }
+
                 }
             }
+        }
+
+        private static DeviceContext GetSharpDxDeviceContextWithReflection(GraphicsDevice monoGameGraphicsDevice)
+        {
+            return (DeviceContext)typeof(GraphicsDevice)
+                .GetField("_d3dContext", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(monoGameGraphicsDevice);
+        }
+
+        private static Resource GetSharpDXResourceWithReflection(Texture renderTarget2D)
+        {
+            return (Resource)typeof(Texture)
+                .GetField("_texture", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(renderTarget2D);
         }
 
         private static GraphicsDevice CreateSharedGraphicsDevice(PresentationParameters presentationParameters)
@@ -315,9 +370,15 @@ namespace MonoGame.Framework.WpfInterop
                     // finally we can safely call dispose without receiving NullReferenceException
                     GraphicsDevice.Dispose();
                     if (UseASingleSharedGraphicsDevice)
+                    {
                         _staticGraphicsDevice = null;
+                        _staticInnerGraphicsDeviceContext = null;
+                    }
                     else
+                    {
                         _graphicsDevice = null;
+                        _innerGraphicsDeviceContext = null;
+                    }
                 }
             }
         }
@@ -342,6 +403,11 @@ namespace MonoGame.Framework.WpfInterop
                 // (when a rendertarget is swapped, monogame still uses the old one for one more frame)
                 // so queue dispose for later
                 _toBeDisposedNextFrame.Add(_cachedRenderTarget);
+            }
+
+            if (_cachedNoMSAARenderTarget != null)
+            {
+                _toBeDisposedNextFrame.Add(_cachedNoMSAARenderTarget);
             }
 
             int width = (int)(Math.Max(ActualWidth, 1) * DpiScalingFactor);
@@ -370,6 +436,13 @@ namespace MonoGame.Framework.WpfInterop
             // -> always preserve its contents so worst case user gets to see the old screen again
             _cachedRenderTarget = new RenderTarget2D(GraphicsDevice, width, height, false, SurfaceFormat.Bgr32,
                 DepthFormat.Depth24Stencil8, ms, RenderTargetUsage.PreserveContents, false);
+
+            _cachedNoMSAARenderTarget = new RenderTarget2D(GraphicsDevice, width, height, false, SurfaceFormat.Bgr32,
+                DepthFormat.Depth24Stencil8, 0, RenderTargetUsage.DiscardContents, true);
+
+            // get the resources to copy the content from one to the other
+            _sharedRenderTargetResource = GetSharpDXResourceWithReflection(_sharedRenderTarget);
+            _cachedNoMSAARenderTargetResource = GetSharpDXResourceWithReflection(_cachedNoMSAARenderTarget);
         }
 
         private void InitializeImageSource()
@@ -558,19 +631,28 @@ namespace MonoGame.Framework.WpfInterop
                 GraphicsDevice.Flush();
             }
 
-            _d3D11Image.Lock();
-            // poor man's swap chain implementation
-            // now draw from cache to backbuffer
-            GraphicsDevice.SetRenderTarget(_sharedRenderTarget);
+            // draw cached rendering target with MSAA to target without MSAA since not allowed in shared textures
+            GraphicsDevice.SetRenderTarget(_cachedNoMSAARenderTarget);
             _spriteBatch.Begin();
             _spriteBatch.Draw(_cachedRenderTarget, GraphicsDevice.Viewport.Bounds, Color.White);
             _spriteBatch.End();
             GraphicsDevice.Flush();
 
+            // poor man's swap chain implementation
+            // now copy from cache without MSAA to back buffer
+            _d3D11Image.Lock();
+
+            // Wait for rendering to finish and put the cached rendering into the shared target.
+            InnerGraphicsDeviceContext.ResolveSubresource(
+                _cachedNoMSAARenderTargetResource, 0,
+                _sharedRenderTargetResource, 0,
+                Format.B8G8R8X8_UNorm);
+
             _d3D11Image.Unlock();
-            GraphicsDevice.SetRenderTarget(_cachedRenderTarget);
             _d3D11Image.Invalidate(); // Always invalidate D3DImage to reduce flickering
                                       // during window resizing.
+
+            GraphicsDevice.SetRenderTarget(_cachedRenderTarget);
 
             _resetBackBuffer = false;
         }
@@ -614,6 +696,7 @@ namespace MonoGame.Framework.WpfInterop
             }
             if (_sharedRenderTarget != null)
             {
+                _sharedRenderTargetResource = null;
                 _sharedRenderTarget.Dispose();
                 _sharedRenderTarget = null;
             }
@@ -630,6 +713,12 @@ namespace MonoGame.Framework.WpfInterop
                     _cachedRenderTarget.Dispose();
                 }
                 _cachedRenderTarget = null;
+            }
+            if (_cachedNoMSAARenderTarget != null)
+            {
+                _cachedNoMSAARenderTargetResource = null;
+                _cachedNoMSAARenderTarget.Dispose();
+                _cachedNoMSAARenderTarget = null;
             }
         }
     }
