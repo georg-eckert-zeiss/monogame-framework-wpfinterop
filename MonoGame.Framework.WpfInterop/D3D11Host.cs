@@ -71,7 +71,6 @@ namespace MonoGame.Framework.WpfInterop
 
         private bool _resetBackBuffer, _dpiChanged;
         private bool _isActive;
-        private SpriteBatch _spriteBatch;
         private double _dpiScalingFactor = 1;
         private static bool _useASingleSharedGraphicsDevice = false;
         private List<IDisposable> _toBeDisposedNextFrame = new List<IDisposable>();
@@ -241,11 +240,6 @@ namespace MonoGame.Framework.WpfInterop
             _disposed = true;
             Activated = null;
             Deactivated = null;
-            if (_spriteBatch != null)
-            {
-                _spriteBatch.Dispose();
-                _spriteBatch = null;
-            }
             Dispose(true);
         }
 
@@ -456,7 +450,6 @@ namespace MonoGame.Framework.WpfInterop
             _d3D11Image.IsFrontBufferAvailableChanged += OnIsFrontBufferAvailableChanged;
             CreateBackBuffer();
             Source = _d3D11Image;
-            _spriteBatch = new SpriteBatch(GraphicsDevice);
         }
 
         private void OnIsFrontBufferAvailableChanged(object sender, DependencyPropertyChangedEventArgs eventArgs)
