@@ -204,7 +204,7 @@ namespace MonoGame.Framework.WpfInterop
         /// <summary>
         /// Gets the inner SharpDX graphics device context.
         /// </summary>
-        public DeviceContext InnerGraphicsDeviceContext => UseASingleSharedGraphicsDevice ? _staticInnerGraphicsDeviceContext : _innerGraphicsDeviceContext;
+        private DeviceContext InnerGraphicsDeviceContext => UseASingleSharedGraphicsDevice ? _staticInnerGraphicsDeviceContext : _innerGraphicsDeviceContext;
 
         /// <summary>
         /// Default services collection.
