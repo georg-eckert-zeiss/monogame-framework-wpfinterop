@@ -63,6 +63,11 @@ namespace MonoGame.Framework.WpfInterop
         /// </summary>
         private Resource _cachedRenderTargetResource;
 
+        /// <summary>
+        /// The equivalent of the <see cref="SurfaceFormat"/> used in the cached and shared render targets.
+        /// </summary>
+        private Format _commonSurfaceFormatDXGIEquivalent;
+
 
         private bool _resetBackBuffer, _dpiChanged;
         private bool _isActive;
@@ -341,7 +346,7 @@ namespace MonoGame.Framework.WpfInterop
                 if (GraphicsDevice == null)
                     throw new NotSupportedException("Can only recreate graphicsdevice when one already exists. Initalize one first!");
 
-                CreateGraphicsDeviceDependentResources(pp);
+                CreateGraphicsDeviceDependentResources(pp, SurfaceFormat.Bgr32);
             }
         }
 
@@ -413,23 +418,24 @@ namespace MonoGame.Framework.WpfInterop
                 BackBufferWidth = width,
                 BackBufferHeight = height,
                 MultiSampleCount = sampleCount
-            });
+            },
+                SurfaceFormat.Bgr32);
         }
 
-        private void CreateGraphicsDeviceDependentResources(PresentationParameters pp)
+        private void CreateGraphicsDeviceDependentResources(PresentationParameters pp, SurfaceFormat preferredFormat)
         {
             var width = pp.BackBufferWidth;
             var height = pp.BackBufferHeight;
             var ms = pp.MultiSampleCount;
 
-            _sharedRenderTarget = new RenderTarget2D(GraphicsDevice, width, height, false, SurfaceFormat.Bgr32,
+            _sharedRenderTarget = new RenderTarget2D(GraphicsDevice, width, height, false, preferredFormat,
                     DepthFormat.Depth24Stencil8, 0, RenderTargetUsage.PreserveContents, true);
             _d3D11Image.SetBackBuffer(_sharedRenderTarget);
 
             // internal rendertarget; all user draws render into this before we draw it to the actual back buffer
             // that way flickering of screen will be prevented when under heavy system load (such as when using rendertargets on intel graphics: https://gitlab.com/MarcStan/MonoGame.Framework.WpfInterop/issues/12)
             // -> always preserve its contents so worst case user gets to see the old screen again
-            _cachedRenderTarget = new RenderTarget2D(GraphicsDevice, width, height, false, SurfaceFormat.Bgr32,
+            _cachedRenderTarget = new RenderTarget2D(GraphicsDevice, width, height, false, preferredFormat,
                 DepthFormat.Depth24Stencil8, ms, RenderTargetUsage.DiscardContents, false);
 
             // get the resources to copy the content from one to the other
@@ -440,6 +446,8 @@ namespace MonoGame.Framework.WpfInterop
             _cachedRenderTargetResource = ms > 1
                 ? GetSharpDXMSResourceWithReflection(_cachedRenderTarget)
                 : GetSharpDXResourceWithReflection(_cachedRenderTarget);
+
+            _commonSurfaceFormatDXGIEquivalent = ToDXGIFormat(preferredFormat);
         }
 
         private void InitializeImageSource()
@@ -636,7 +644,7 @@ namespace MonoGame.Framework.WpfInterop
             InnerGraphicsDeviceContext.ResolveSubresource(
                 _cachedRenderTargetResource, 0,
                 _sharedRenderTargetResource, 0,
-                Format.B8G8R8X8_UNorm);
+                _commonSurfaceFormatDXGIEquivalent);
 
             _d3D11Image.Unlock();
             _d3D11Image.Invalidate(); // Always invalidate D3DImage to reduce flickering
@@ -705,6 +713,26 @@ namespace MonoGame.Framework.WpfInterop
                     _cachedRenderTarget.Dispose();
                 }
                 _cachedRenderTarget = null;
+            }
+        }
+
+        /// <summary>
+        /// Resolves a given MonoGame <see cref="SurfaceFormat"/> to a supported and equivalent DXGI <see cref="Format"/>.
+        /// Only <see cref="SurfaceFormat"/>.Bgr23 and <see cref="SurfaceFormat"/>.Bgra32 are supported.
+        /// </summary>
+        /// <param name="format">Format to be resolved to equivalent DXGI format.</param>
+        /// <returns>Equivalent DXGI format.</returns>
+        /// <exception cref="ArgumentException">On handing in unsupported format.</exception>
+        private static Format ToDXGIFormat(SurfaceFormat format)
+        {
+            switch (format)
+            {
+                case SurfaceFormat.Bgr32:
+                    return Format.B8G8R8X8_UNorm;
+                case SurfaceFormat.Bgra32:
+                    return Format.B8G8R8A8_UNorm;
+                default:
+                    throw new ArgumentException("Unexpected surface format. Supported formats are: SurfaceFormat.Bgr32, SurfaceFormat.Bgra32.", "format");
             }
         }
     }
