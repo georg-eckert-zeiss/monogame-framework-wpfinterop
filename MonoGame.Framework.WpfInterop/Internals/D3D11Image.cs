@@ -102,7 +102,7 @@ namespace MonoGame.Framework.WpfInterop.Internals
                 using (Surface surface = _backBuffer.GetSurfaceLevel(0))
                 {
                     Lock();
-                    SetBackBuffer(D3DResourceType.IDirect3DSurface9, surface.NativePointer);
+                    SetBackBuffer(D3DResourceType.IDirect3DSurface9, surface.NativePointer, true);
                     Unlock();
                 }
             }
@@ -110,7 +110,7 @@ namespace MonoGame.Framework.WpfInterop.Internals
             {
                 // Reset back buffer.
                 Lock();
-                SetBackBuffer(D3DResourceType.IDirect3DSurface9, IntPtr.Zero);
+                SetBackBuffer(D3DResourceType.IDirect3DSurface9, IntPtr.Zero, true);
                 Unlock();
             }
 
