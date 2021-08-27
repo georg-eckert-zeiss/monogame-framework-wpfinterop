@@ -59,16 +59,9 @@ namespace MonoGame.Framework.WpfInterop
         private RenderTarget2D _cachedRenderTarget;
 
         /// <summary>
-        /// The <see cref="_cachedRenderTarget"/> will be drawn into this render target which has no MSAA enabled. This
-        /// makes it possible to copy over the content of this render target's resource to the
-        /// <see cref="_sharedRenderTarget"/>'s resource.
-        /// </summary>
-        private RenderTarget2D _cachedNoMSAARenderTarget;
-
-        /// <summary>
         /// Inner SharpDX resource of the cached no MSAA render target.
         /// </summary>
-        private Resource _cachedNoMSAARenderTargetResource;
+        private Resource _cachedRenderTargetResource;
 
 
         private bool _resetBackBuffer, _dpiChanged;
@@ -324,6 +317,13 @@ namespace MonoGame.Framework.WpfInterop
                 .GetValue(renderTarget2D);
         }
 
+        private static Resource GetSharpDXMSResourceWithReflection(RenderTarget2D renderTarget2D)
+        {
+            return (Resource)typeof(RenderTarget2D)
+                .GetField("_msTexture", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(renderTarget2D);
+        }
+
         private static GraphicsDevice CreateSharedGraphicsDevice(PresentationParameters presentationParameters)
         {
             // TODO: could allow user to chose which adapter to use
@@ -405,11 +405,6 @@ namespace MonoGame.Framework.WpfInterop
                 _toBeDisposedNextFrame.Add(_cachedRenderTarget);
             }
 
-            if (_cachedNoMSAARenderTarget != null)
-            {
-                _toBeDisposedNextFrame.Add(_cachedNoMSAARenderTarget);
-            }
-
             int width = (int)(Math.Max(ActualWidth, 1) * DpiScalingFactor);
             int height = (int)(Math.Max(ActualHeight, 1) * DpiScalingFactor);
 
@@ -428,21 +423,23 @@ namespace MonoGame.Framework.WpfInterop
             var ms = pp.MultiSampleCount;
 
             _sharedRenderTarget = new RenderTarget2D(GraphicsDevice, width, height, false, SurfaceFormat.Bgr32,
-                    DepthFormat.Depth24Stencil8, 0, RenderTargetUsage.DiscardContents, true);
+                    DepthFormat.Depth24Stencil8, 0, RenderTargetUsage.PreserveContents, true);
             _d3D11Image.SetBackBuffer(_sharedRenderTarget);
 
             // internal rendertarget; all user draws render into this before we draw it to the actual back buffer
             // that way flickering of screen will be prevented when under heavy system load (such as when using rendertargets on intel graphics: https://gitlab.com/MarcStan/MonoGame.Framework.WpfInterop/issues/12)
             // -> always preserve its contents so worst case user gets to see the old screen again
             _cachedRenderTarget = new RenderTarget2D(GraphicsDevice, width, height, false, SurfaceFormat.Bgr32,
-                DepthFormat.Depth24Stencil8, ms, RenderTargetUsage.PreserveContents, false);
-
-            _cachedNoMSAARenderTarget = new RenderTarget2D(GraphicsDevice, width, height, false, SurfaceFormat.Bgr32,
-                DepthFormat.Depth24Stencil8, 0, RenderTargetUsage.DiscardContents, true);
+                DepthFormat.Depth24Stencil8, ms, RenderTargetUsage.DiscardContents, false);
 
             // get the resources to copy the content from one to the other
             _sharedRenderTargetResource = GetSharpDXResourceWithReflection(_sharedRenderTarget);
-            _cachedNoMSAARenderTargetResource = GetSharpDXResourceWithReflection(_cachedNoMSAARenderTarget);
+
+            // If we use MSAA, we need a different resource than without it.
+            // Otherwise we get a blank resource.
+            _cachedRenderTargetResource = ms > 1
+                ? GetSharpDXMSResourceWithReflection(_cachedRenderTarget)
+                : GetSharpDXResourceWithReflection(_cachedRenderTarget);
         }
 
         private void InitializeImageSource()
@@ -631,20 +628,13 @@ namespace MonoGame.Framework.WpfInterop
                 GraphicsDevice.Flush();
             }
 
-            // draw cached rendering target with MSAA to target without MSAA since not allowed in shared textures
-            GraphicsDevice.SetRenderTarget(_cachedNoMSAARenderTarget);
-            _spriteBatch.Begin();
-            _spriteBatch.Draw(_cachedRenderTarget, GraphicsDevice.Viewport.Bounds, Color.White);
-            _spriteBatch.End();
-            GraphicsDevice.Flush();
-
             // poor man's swap chain implementation
             // now copy from cache without MSAA to back buffer
             _d3D11Image.Lock();
 
             // Wait for rendering to finish and put the cached rendering into the shared target.
             InnerGraphicsDeviceContext.ResolveSubresource(
-                _cachedNoMSAARenderTargetResource, 0,
+                _cachedRenderTargetResource, 0,
                 _sharedRenderTargetResource, 0,
                 Format.B8G8R8X8_UNorm);
 
@@ -702,6 +692,8 @@ namespace MonoGame.Framework.WpfInterop
             }
             if (_cachedRenderTarget != null)
             {
+                _cachedRenderTargetResource = null;
+
                 if (_cachedRenderTarget.MultiSampleCount > 0 && UseASingleSharedGraphicsDevice)
                 {
                     // TODO: this is a memoryleak, the code is intentional because Dispose actually crashes Monogame when using a shared graphicsdevice and disposing MSAA enabled rendertargets
@@ -713,12 +705,6 @@ namespace MonoGame.Framework.WpfInterop
                     _cachedRenderTarget.Dispose();
                 }
                 _cachedRenderTarget = null;
-            }
-            if (_cachedNoMSAARenderTarget != null)
-            {
-                _cachedNoMSAARenderTargetResource = null;
-                _cachedNoMSAARenderTarget.Dispose();
-                _cachedNoMSAARenderTarget = null;
             }
         }
     }
