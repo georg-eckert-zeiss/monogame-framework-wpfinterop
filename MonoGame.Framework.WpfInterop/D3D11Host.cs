@@ -5,10 +5,14 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using SharpDX.Direct3D11;
+using SharpDX.DXGI;
 using Color = Microsoft.Xna.Framework.Color;
+using Resource = SharpDX.Direct3D11.Resource;
 
 namespace MonoGame.Framework.WpfInterop
 {
@@ -29,6 +33,11 @@ namespace MonoGame.Framework.WpfInterop
         private static bool? _isInDesignMode;
         private static int _referenceCount;
 
+        // References to the inner SharpDX graphics device context
+        private static DeviceContext _staticInnerGraphicsDeviceContext;
+        private DeviceContext _innerGraphicsDeviceContext;
+
+
         private D3D11Image _d3D11Image;
         private bool _disposed;
         private TimeSpan _lastRenderingTime;
@@ -38,15 +47,30 @@ namespace MonoGame.Framework.WpfInterop
         /// Shared between WPF and monogame.
         /// </summary>
         private RenderTarget2D _sharedRenderTarget;
+
+        /// <summary>
+        /// Inner SharpDX resource of the shared render target.
+        /// </summary>
+        private Resource _sharedRenderTargetResource;
+
         /// <summary>
         /// Actual rendertarget that monogame will draw into.
-        /// Once a draw call is finished it then copies its content to <see cref="_sharedRenderTarget"/>.
-        /// This prevents flickering of the screen when WPF decides to draw the rendertarget to screen while monogame is midway populating it.
         /// </summary>
         private RenderTarget2D _cachedRenderTarget;
+
+        /// <summary>
+        /// Inner SharpDX resource of the cached no MSAA render target.
+        /// </summary>
+        private Resource _cachedRenderTargetResource;
+
+        /// <summary>
+        /// The equivalent of the <see cref="SurfaceFormat"/> used in the cached and shared render targets.
+        /// </summary>
+        private Format _commonSurfaceFormatDXGIEquivalent;
+
+
         private bool _resetBackBuffer, _dpiChanged;
         private bool _isActive;
-        private SpriteBatch _spriteBatch;
         private double _dpiScalingFactor = 1;
         private static bool _useASingleSharedGraphicsDevice = false;
         private List<IDisposable> _toBeDisposedNextFrame = new List<IDisposable>();
@@ -177,6 +201,11 @@ namespace MonoGame.Framework.WpfInterop
         public GraphicsDevice GraphicsDevice => UseASingleSharedGraphicsDevice ? _staticGraphicsDevice : _graphicsDevice;
 
         /// <summary>
+        /// Gets the inner SharpDX graphics device context.
+        /// </summary>
+        private DeviceContext InnerGraphicsDeviceContext => UseASingleSharedGraphicsDevice ? _staticInnerGraphicsDeviceContext : _innerGraphicsDeviceContext;
+
+        /// <summary>
         /// Default services collection.
         /// </summary>
         public GameServiceContainer Services { get; } = new GameServiceContainer();
@@ -211,11 +240,6 @@ namespace MonoGame.Framework.WpfInterop
             _disposed = true;
             Activated = null;
             Deactivated = null;
-            if (_spriteBatch != null)
-            {
-                _spriteBatch.Dispose();
-                _spriteBatch = null;
-            }
             Dispose(true);
         }
 
@@ -261,12 +285,42 @@ namespace MonoGame.Framework.WpfInterop
                         DeviceWindowHandle = IntPtr.Zero
                     };
                     var gd = CreateSharedGraphicsDevice(presentationParameters);
+                    var sharpDXdc = GetSharpDxDeviceContextWithReflection(gd);
+
                     if (UseASingleSharedGraphicsDevice)
+                    {
                         _staticGraphicsDevice = gd;
+                        _staticInnerGraphicsDeviceContext = sharpDXdc;
+                    }
                     else
+                    {
                         _graphicsDevice = gd;
+                        _innerGraphicsDeviceContext = sharpDXdc;
+                    }
+
                 }
             }
+        }
+
+        private static DeviceContext GetSharpDxDeviceContextWithReflection(GraphicsDevice monoGameGraphicsDevice)
+        {
+            return (DeviceContext)typeof(GraphicsDevice)
+                .GetField("_d3dContext", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(monoGameGraphicsDevice);
+        }
+
+        private static Resource GetSharpDXResourceWithReflection(Texture renderTarget2D)
+        {
+            return (Resource)typeof(Texture)
+                .GetField("_texture", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(renderTarget2D);
+        }
+
+        private static Resource GetSharpDXMSResourceWithReflection(RenderTarget2D renderTarget2D)
+        {
+            return (Resource)typeof(RenderTarget2D)
+                .GetField("_msTexture", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(renderTarget2D);
         }
 
         private static GraphicsDevice CreateSharedGraphicsDevice(PresentationParameters presentationParameters)
@@ -286,7 +340,7 @@ namespace MonoGame.Framework.WpfInterop
                 if (GraphicsDevice == null)
                     throw new NotSupportedException("Can only recreate graphicsdevice when one already exists. Initalize one first!");
 
-                CreateGraphicsDeviceDependentResources(pp);
+                CreateGraphicsDeviceDependentResources(pp, SurfaceFormat.Bgr32);
             }
         }
 
@@ -315,9 +369,15 @@ namespace MonoGame.Framework.WpfInterop
                     // finally we can safely call dispose without receiving NullReferenceException
                     GraphicsDevice.Dispose();
                     if (UseASingleSharedGraphicsDevice)
+                    {
                         _staticGraphicsDevice = null;
+                        _staticInnerGraphicsDeviceContext = null;
+                    }
                     else
+                    {
                         _graphicsDevice = null;
+                        _innerGraphicsDeviceContext = null;
+                    }
                 }
             }
         }
@@ -352,24 +412,36 @@ namespace MonoGame.Framework.WpfInterop
                 BackBufferWidth = width,
                 BackBufferHeight = height,
                 MultiSampleCount = sampleCount
-            });
+            },
+                SurfaceFormat.Bgr32);
         }
 
-        private void CreateGraphicsDeviceDependentResources(PresentationParameters pp)
+        private void CreateGraphicsDeviceDependentResources(PresentationParameters pp, SurfaceFormat preferredFormat)
         {
             var width = pp.BackBufferWidth;
             var height = pp.BackBufferHeight;
             var ms = pp.MultiSampleCount;
 
-            _sharedRenderTarget = new RenderTarget2D(GraphicsDevice, width, height, false, SurfaceFormat.Bgr32,
-                    DepthFormat.Depth24Stencil8, 0, RenderTargetUsage.DiscardContents, true);
+            _sharedRenderTarget = new RenderTarget2D(GraphicsDevice, width, height, false, preferredFormat,
+                    DepthFormat.Depth24Stencil8, 0, RenderTargetUsage.PreserveContents, true);
             _d3D11Image.SetBackBuffer(_sharedRenderTarget);
 
             // internal rendertarget; all user draws render into this before we draw it to the actual back buffer
             // that way flickering of screen will be prevented when under heavy system load (such as when using rendertargets on intel graphics: https://gitlab.com/MarcStan/MonoGame.Framework.WpfInterop/issues/12)
             // -> always preserve its contents so worst case user gets to see the old screen again
-            _cachedRenderTarget = new RenderTarget2D(GraphicsDevice, width, height, false, SurfaceFormat.Bgr32,
-                DepthFormat.Depth24Stencil8, ms, RenderTargetUsage.PreserveContents, false);
+            _cachedRenderTarget = new RenderTarget2D(GraphicsDevice, width, height, false, preferredFormat,
+                DepthFormat.Depth24Stencil8, ms, RenderTargetUsage.DiscardContents, false);
+
+            // get the resources to copy the content from one to the other
+            _sharedRenderTargetResource = GetSharpDXResourceWithReflection(_sharedRenderTarget);
+
+            // If we use MSAA, we need a different resource than without it.
+            // Otherwise we get a blank resource.
+            _cachedRenderTargetResource = ms > 1
+                ? GetSharpDXMSResourceWithReflection(_cachedRenderTarget)
+                : GetSharpDXResourceWithReflection(_cachedRenderTarget);
+
+            _commonSurfaceFormatDXGIEquivalent = ToDXGIFormat(preferredFormat);
         }
 
         private void InitializeImageSource()
@@ -378,7 +450,6 @@ namespace MonoGame.Framework.WpfInterop
             _d3D11Image.IsFrontBufferAvailableChanged += OnIsFrontBufferAvailableChanged;
             CreateBackBuffer();
             Source = _d3D11Image;
-            _spriteBatch = new SpriteBatch(GraphicsDevice);
         }
 
         private void OnIsFrontBufferAvailableChanged(object sender, DependencyPropertyChangedEventArgs eventArgs)
@@ -558,19 +629,21 @@ namespace MonoGame.Framework.WpfInterop
                 GraphicsDevice.Flush();
             }
 
-            _d3D11Image.Lock();
             // poor man's swap chain implementation
-            // now draw from cache to backbuffer
-            GraphicsDevice.SetRenderTarget(_sharedRenderTarget);
-            _spriteBatch.Begin();
-            _spriteBatch.Draw(_cachedRenderTarget, GraphicsDevice.Viewport.Bounds, Color.White);
-            _spriteBatch.End();
-            GraphicsDevice.Flush();
+            // now copy from cache without MSAA to back buffer
+            _d3D11Image.Lock();
+
+            // Wait for rendering to finish and put the cached rendering into the shared target.
+            InnerGraphicsDeviceContext.ResolveSubresource(
+                _cachedRenderTargetResource, 0,
+                _sharedRenderTargetResource, 0,
+                _commonSurfaceFormatDXGIEquivalent);
 
             _d3D11Image.Unlock();
-            GraphicsDevice.SetRenderTarget(_cachedRenderTarget);
             _d3D11Image.Invalidate(); // Always invalidate D3DImage to reduce flickering
                                       // during window resizing.
+
+            GraphicsDevice.SetRenderTarget(_cachedRenderTarget);
 
             _resetBackBuffer = false;
         }
@@ -614,11 +687,14 @@ namespace MonoGame.Framework.WpfInterop
             }
             if (_sharedRenderTarget != null)
             {
+                _sharedRenderTargetResource = null;
                 _sharedRenderTarget.Dispose();
                 _sharedRenderTarget = null;
             }
             if (_cachedRenderTarget != null)
             {
+                _cachedRenderTargetResource = null;
+
                 if (_cachedRenderTarget.MultiSampleCount > 0 && UseASingleSharedGraphicsDevice)
                 {
                     // TODO: this is a memoryleak, the code is intentional because Dispose actually crashes Monogame when using a shared graphicsdevice and disposing MSAA enabled rendertargets
@@ -630,6 +706,26 @@ namespace MonoGame.Framework.WpfInterop
                     _cachedRenderTarget.Dispose();
                 }
                 _cachedRenderTarget = null;
+            }
+        }
+
+        /// <summary>
+        /// Resolves a given MonoGame <see cref="SurfaceFormat"/> to a supported and equivalent DXGI <see cref="Format"/>.
+        /// Only <see cref="SurfaceFormat"/>.Bgr23 and <see cref="SurfaceFormat"/>.Bgra32 are supported.
+        /// </summary>
+        /// <param name="format">Format to be resolved to equivalent DXGI format.</param>
+        /// <returns>Equivalent DXGI format.</returns>
+        /// <exception cref="ArgumentException">On handing in unsupported format.</exception>
+        private static Format ToDXGIFormat(SurfaceFormat format)
+        {
+            switch (format)
+            {
+                case SurfaceFormat.Bgr32:
+                    return Format.B8G8R8X8_UNorm;
+                case SurfaceFormat.Bgra32:
+                    return Format.B8G8R8A8_UNorm;
+                default:
+                    throw new ArgumentException("Unexpected surface format. Supported formats are: SurfaceFormat.Bgr32, SurfaceFormat.Bgra32.", "format");
             }
         }
     }
