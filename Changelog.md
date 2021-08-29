@@ -1,5 +1,10 @@
 # Changelog
 
+**v1.9.1**
+
+* Fixed bug that causes flickering due to sync issue ([issue #27](https://github.com/MarcStan/monogame-framework-wpfinterop/issues/27)) by [georg-eckert-zeiss](https://github.com/MarcStan/monogame-framework-wpfinterop/pull/28)
+
+
 **v1.9.0**
 
 * Added support for .Net Core 3.1 and .Net 5 by cross targeting .Net 4.5.2 and .Net Core 3.1
