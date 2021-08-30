@@ -4,7 +4,7 @@
     <TargetFrameworks>netcoreapp3.1;net452</TargetFrameworks>
     <UseWPF>true</UseWPF>
     <PackageId>MonoGame.Framework.WpfInterop</PackageId>
-    <Version>1.9.0</Version>
+    <Version>1.9.1</Version>
     <Authors>MarcStan</Authors>
     <Description>MonoGame integration with WPF. This package provides the D3D11Host from the MonoGame WpfInteropSample. It extends it with WpfGame, WpfMouse and WpfKeyboard and makes it actually usable in any WPF application.
 
